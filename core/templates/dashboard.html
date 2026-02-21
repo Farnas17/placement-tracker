@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Placement Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: Arial;
+            padding: 40px;
+            background: #f4f6f9;
+        }
+
+        .nav {
+            margin-bottom: 25px;
+        }
+
+        .nav a {
+            text-decoration: none;
+            margin-right: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            margin-bottom: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .score {
+            font-size: 48px;
+            font-weight: bold;
+        }
+
+        .progress {
+            height: 12px;
+            background: #ddd;
+            border-radius: 20px;
+            margin-top: 8px;
+        }
+
+        .progress-bar {
+            height: 12px;
+            border-radius: 20px;
+        }
+
+        button.logout-btn {
+            background: none;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            color: #333;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="nav">
+    <a href="{% url 'dashboard-ui' %}">Dashboard</a>
+    <a href="{% url 'tasks-ui' %}">Tasks</a>
+
+    <!-- Proper POST Logout -->
+    <form method="post" action="{% url 'logout' %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="logout-btn">Logout</button>
+    </form>
+</div>
+
+<h1>Placement Readiness Dashboard</h1>
+
+<div class="card">
+    <div>Total: <span id="total"></span></div>
+    <div>Completed: <span id="completed"></span></div>
+    <div>Pending: <span id="pending"></span></div>
+</div>
+
+<div class="card">
+    <div>Readiness</div>
+    <div class="score" id="readiness"></div>
+    <div class="progress">
+        <div class="progress-bar" id="readinessBar"></div>
+    </div>
+    <div id="performanceClass"></div>
+</div>
+
+<div class="card">
+    <h3>Weekly Trend</h3>
+    <canvas id="weeklyChart"></canvas>
+</div>
+
+<div class="card">
+    <h3>Category Distribution</h3>
+    <canvas id="categoryChart"></canvas>
+</div>
+
+<div class="card">
+    <h3>Weekly Reality Report</h3>
+    <ul id="insightsList"></ul>
+</div>
+
+<script>
+async function loadDashboard() {
+
+    const response = await fetch("/api/dashboard/");
+
+    if (!response.ok) {
+        window.location.href = "/login/";
+        return;
+    }
+
+    const data = await response.json();
+
+    document.getElementById("total").innerText = data.total_tasks;
+    document.getElementById("completed").innerText = data.completed_tasks;
+    document.getElementById("pending").innerText = data.pending_tasks;
+
+    const readiness = data.readiness_score;
+    document.getElementById("readiness").innerText = readiness + "%";
+
+    const bar = document.getElementById("readinessBar");
+    bar.style.width = readiness + "%";
+    bar.style.background = readiness >= 60 ? "#4CAF50" : "#f44336";
+
+    document.getElementById("performanceClass").innerText =
+        readiness >= 60 ? "On Track" : "Needs Improvement";
+
+    if (!data.weekly_trend_counts.every(v => v === 0)) {
+        new Chart(document.getElementById("weeklyChart"), {
+            type: "line",
+            data: {
+                labels: data.weekly_trend_labels,
+                datasets: [{
+                    data: data.weekly_trend_counts,
+                    borderColor: "#4CAF50",
+                    fill: false
+                }]
+            }
+        });
+    }
+
+    const labels = data.category_breakdown.map(c => c.category);
+    const counts = data.category_breakdown.map(c => c.count);
+
+    if (labels.length > 0) {
+        new Chart(document.getElementById("categoryChart"), {
+            type: "pie",
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: counts
+                }]
+            }
+        });
+    }
+
+    const list = document.getElementById("insightsList");
+    list.innerHTML = "";
+
+    data.weekly_insights.forEach(item => {
+        const li = document.createElement("li");
+        li.innerText = item;
+        list.appendChild(li);
+    });
+}
+
+loadDashboard();
+</script>
+
+</body>
+</html>
